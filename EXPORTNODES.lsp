@@ -1,0 +1,56 @@
+(defun C:EXPORTNODES (/ ent entdata coords pt file path i first lastpt)
+  (setq ent (entsel "\nВыберите контур (полилинию): "))
+  (if (not ent) (progn (princ "\nОбъект не выбран!") (exit)))
+  (setq entdata (entget (car ent)))
+  (if (not (member (cdr (assoc 0 entdata)) '("LWPOLYLINE" "POLYLINE")))
+    (progn (princ "\nВыбранный объект не является полилинией!") (exit))
+  )
+
+  ;; Извлечение координат
+  (if (= (cdr (assoc 0 entdata)) "LWPOLYLINE")
+    (progn
+      (setq coords '())
+      (foreach item entdata
+        (if (= (car item) 10) (setq coords (cons (cdr item) coords)))
+      )
+      (setq coords (reverse coords))
+    )
+    (progn
+      (setq coords '())
+      (setq v (entnext (car ent)))
+      (while (and v (not (member (cdr (assoc 0 (entget v))) '("SEQEND"))))
+        (setq pt (cdr (assoc 10 (entget v))))
+        (setq coords (cons pt coords))
+        (setq v (entnext v))
+      )
+      (setq coords (reverse coords))
+    )
+  )
+  (if (or (null coords) (< (length coords) 2))
+    (progn (princ "\nНедостаточно вершин!") (exit))
+  )
+
+  ;; Если последняя НЕ совпадает с первой – добавляем первую в конец (замыкаем)
+  (setq first (car coords))
+  (setq lastpt (car (reverse coords)))
+  (if (not (and (equal (car first) (car lastpt) 1e-8)
+                (equal (cadr first) (cadr lastpt) 1e-8)))
+    (setq coords (append coords (list first)))
+  )
+
+  ;; Запись в файл (формат: №; Y; X)
+  (setq path (strcat (getenv "USERPROFILE") "\\Desktop\\nodes.csv"))
+  (setq file (open path "w"))
+  (if (null file) (progn (princ "\nНе удалось создать файл!") (exit)))
+  (setq i 1)
+  (foreach pt coords
+    (write-line
+      (strcat (itoa i) ";" (rtos (cadr pt) 2 2) ";" (rtos (car pt) 2 2))
+      file
+    )
+    (setq i (1+ i))
+  )
+  (close file)
+  (princ (strcat "\nГотово! Файл: " path " (с замыканием, первая=последняя)"))
+  (princ)
+)
