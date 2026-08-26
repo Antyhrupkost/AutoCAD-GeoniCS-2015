@@ -1,0 +1,10 @@
+$file = "C:\Users\admin\Desktop\GeoPoint\Selo.txt"
+$content = Get-Content $file
+$newContent = $content | ForEach-Object { 
+    if ($_ -match ",") { 
+        $last = ($_ -split ",")[-1]; 
+        $_ + "," + $last 
+    } else { $_ } 
+}
+$newContent | Set-Content $file -Encoding UTF8
+Write-Host "Готово!"
