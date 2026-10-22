@@ -2,10 +2,23 @@
                 type_str num_str style1 style2 p_near param pt_start pt_end 
                 v_edge len_edge u_edge v_in inside_dir norm_ang text_base
                 scr_start scr_end p_left_corner p_right_corner u_right
-                tmp_txt minpt maxpt txt_w txt_h shift_back shift_in th)
+                tmp_txt minpt maxpt txt_w txt_h shift_back shift_in 
+                old_osmode old_error vec_x vec_y len proj_len)
   (vl-load-com)
   
-  ;; Вспомогательная функция для определения фиксированной высоты стиля
+  ;; РЎРѕС…СЂР°РЅСЏРµРј РёСЃС…РѕРґРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ РґР»СЏ Р·Р°С‰РёС‚С‹ РёРЅС‚РµСЂС„РµР№СЃР°
+  (setq old_osmode (getvar "OSMODE"))
+  (setq old_error *error*)
+
+  ;; Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ РѕР±СЂР°Р±РѕС‚С‡РёРє РѕС€РёР±РѕРє РґР»СЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРіРѕ РІРѕР·РІСЂР°С‚Р° РїСЂРёРІСЏР·РѕРє
+  (defun *error* (msg)
+    (setvar "OSMODE" old_osmode)
+    (setq *error* old_error)
+    (princ (strcat "\n[ZD] Р Р°Р±РѕС‚Р° СЃРєСЂРёРїС‚Р° РїСЂРµСЂРІР°РЅР°: " msg))
+    (princ)
+  )
+
+  ;; Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РѕРїСЂРµРґРµР»РµРЅРёСЏ С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕР№ РІС‹СЃРѕС‚С‹ СЃС‚РёР»СЏ
   (defun get-style-height (style_name / style_data)
     (if (setq style_data (tblsearch "STYLE" style_name))
       (cdr (assoc 40 style_data))
@@ -13,7 +26,7 @@
     )
   )
 
-  ;; Вспомогательная функция для создания честного MTEXT через entmake
+  ;; Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ СЃРѕР·РґР°РЅРёСЏ С‡РµСЃС‚РЅРѕРіРѕ MTEXT
   (defun draw-mtext-safe (str pt height ang style lay col attachment / th_val)
     (setq th_val (get-style-height style))
     (if (= th_val 0.0) (setq th_val height))
@@ -31,42 +44,63 @@
                (cons 7 style)
                (cons 11 (list (cos ang) (sin ang) 0.0))
              ))
-    (entlast) ; Теперь функция всегда строго возвращает имя созданного объекта
+    (entlast)
   )
 
-  ;; 1. Проверка и создание слоя
-  (if (not (tblsearch "LAYER" "21_Здания_строения"))
+  ;; РџСЂРѕРІРµСЂРєР° Рё СЃРѕР·РґР°РЅРёРµ СЃР»РѕСЏ
+  (if (not (tblsearch "LAYER" "21_Р—РґР°РЅРёСЏ_СЃС‚СЂРѕРµРЅРёСЏ"))
     (entmake (list
                '(0 . "LAYER")
                '(100 . "AcDbSymbolTableRecord")
                '(100 . "AcDbLayerTableRecord")
-               '(2 . "21_Здания_строения")
+               '(2 . "21_Р—РґР°РЅРёСЏ_СЃС‚СЂРѕРµРЅРёСЏ")
                '(70 . 0)
                '(62 . 7)
                '(6 . "Continuous")
              ))
   )
 
-  ;; Определение стилей текста
-  (setq style1 "Р131")
+  ;; РћРїСЂРµРґРµР»РµРЅРёРµ СЃС‚РёР»РµР№ С‚РµРєСЃС‚Р°
+  (setq style1 "Р 131")
   (if (not (tblsearch "STYLE" style1)) (setq style1 "P131"))
   (if (not (tblsearch "STYLE" style1)) (setq style1 (getvar "TEXTSTYLE")))
 
   (setq style2 "D431")
   (if (not (tblsearch "STYLE" style2)) (setq style2 (getvar "TEXTSTYLE")))
 
-  ;; 2. Запрос 3-х точек для построения прямоугольника
-  (setq p1 (getpoint "\nУкажите первую точку (базовая линия): "))
-  (if p1 (setq p2 (getpoint p1 "\nУкажите вторую точку (базовая линия): ")))
-  (if (and p1 p2) (setq p3 (getpoint p2 "\nУкажите третью точку (ширина): ")))
+  ;; 2. Р—РђРџР РћРЎ РўРћР§Р•Рљ РЎ РћР‘РќРЈР›Р•РќРР•Рњ Р’Р«РЎРћРўР« Z Р”Р›РЇ Р—РђР©РРўР« РћРў РЎРҐР›РћРџР«Р’РђРќРРЇ
+  (setq p1 (getpoint "\nРЈРєР°Р¶РёС‚Рµ РїРµСЂРІСѓСЋ С‚РѕС‡РєСѓ (Р±Р°Р·РѕРІР°СЏ Р»РёРЅРёСЏ): "))
+  ;; Р•СЃР»Рё С‚РѕС‡РєР° РІС‹Р±СЂР°РЅР° (РґР°Р¶Рµ СЃ Z РєРѕРѕСЂРґРёРЅР°С‚РѕР№ РіРµРѕС‚РѕС‡РєРё), РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ Р·Р°РЅСѓР»СЏРµРј Z
+  (if p1 (setq p1 (list (car p1) (cadr p1) 0.0)))
+  
+  (if p1 
+    (progn
+      (setq p2 (getpoint p1 "\nРЈРєР°Р¶РёС‚Рµ РІС‚РѕСЂСѓСЋ С‚РѕС‡РєСѓ (Р±Р°Р·РѕРІР°СЏ Р»РёРЅРёСЏ): "))
+      (if p2 (setq p2 (list (car p2) (cadr p2) 0.0)))
+    )
+  )
+  
+  (if (and p1 p2)
+    (progn
+      (setq p3 (getpoint p2 "\nРЈРєР°Р¶РёС‚Рµ С‚СЂРµС‚СЊСЋ С‚РѕС‡РєСѓ (С€РёСЂРёРЅР°): "))
+      (if p3 (setq p3 (list (car p3) (cadr p3) 0.0)))
+    )
+  )
   
   (if (and p1 p2 p3)
     (progn
-      ;; Геометрический расчет прямоугольника
+      ;; РћС‚РєР»СЋС‡Р°РµРј РїСЂРёРІСЏР·РєРё РЅР° РІСЂРµРјСЏ СЂР°СЃС‡РµС‚РѕРІ РіРµРѕРјРµС‚СЂРёРё, С‡С‚РѕР±С‹ РёСЃРєР»СЋС‡РёС‚СЊ РІР»РёСЏРЅРёРµ
+      (setvar "OSMODE" 0)
+
+      ;; Р§РёСЃС‚С‹Р№ 2D С‚СЂРёРіРѕРЅРѕРјРµС‚СЂРёС‡РµСЃРєРёР№ СЂР°СЃС‡РµС‚ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР°
       (setq vec_x (- (car p2) (car p1))
             vec_y (- (cadr p2) (cadr p1))
             len (distance p1 p2)
-            u_x (/ vec_x len)
+      )
+      
+      (if (equal len 0.0 0.001) (setq len 1.0))
+      
+      (setq u_x (/ vec_x len)
             u_y (/ vec_y len)
             v_x (- u_y)
             v_y u_x
@@ -75,11 +109,11 @@
             p3 (list (+ (car p1) (* proj_len v_x)) (+ (cadr p1) (* proj_len v_y)) 0.0)
       )
 
-      ;; Построение контура здания
+      ;; РџРѕСЃС‚СЂРѕРµРЅРёРµ РєРѕРЅС‚СѓСЂР° Р·РґР°РЅРёСЏ
       (entmake (list
                  '(0 . "LWPOLYLINE")
                  '(100 . "AcDbEntity")
-                 '(8 . "21_Здания_строения")
+                 '(8 . "21_Р—РґР°РЅРёСЏ_СЃС‚СЂРѕРµРЅРёСЏ")
                  '(100 . "AcDbPolyline")
                  '(90 . 4)
                  '(70 . 1)
@@ -90,21 +124,26 @@
                ))
       (setq ent (entlast))
 
-      ;; Геометрический центр здания
+      ;; Р“РµРѕРјРµС‚СЂРёС‡РµСЃРєРёР№ С†РµРЅС‚СЂ Р·РґР°РЅРёСЏ
       (setq c_pt (list (/ (+ (car p1) (car p4)) 2.0) (/ (+ (cadr p1) (cadr p4)) 2.0) 0.0))
+      
+      ;; Р’РѕР·РІСЂР°С‰Р°РµРј РїСЂРёРІСЏР·РєРё РґР»СЏ РєРѕСЂСЂРµРєС‚РЅРѕР№ СЂР°Р±РѕС‚С‹ РѕРєРѕРЅ С‡РµСЂС‚РµР¶Р°
+      (setvar "OSMODE" old_osmode)
 
-      ;; 3. Создание и вызов DCL окна
+      ;; 3. РЎРѕР·РґР°РЅРёРµ Рё РІС‹Р·РѕРІ DCL РѕРєРЅР°
       (setq file_path (vl-filename-mktemp "zd_dialog.dcl")
             dcl_file (open file_path "w"))
-      (write-line "zd_dialog : dialog { title = \"Данные здания\";" dcl_file)
-      (write-line "  : edit_box { label = \"Тип сооружения:\"; key = \"eb_type\"; edit_width = 30; }" dcl_file)
-      (write-line "  : edit_box { label = \"Номер дома:\"; key = \"eb_num\"; edit_width = 30; }" dcl_file)
+      (write-line "zd_dialog : dialog { title = \"Р”Р°РЅРЅС‹Рµ Р·РґР°РЅРёСЏ\";" dcl_file)
+      (write-line "  : edit_box { label = \"РўРёРї СЃРѕРѕСЂСѓР¶РµРЅРёСЏ:\"; key = \"eb_type\"; edit_width = 30; }" dcl_file)
+      (write-line "  : edit_box { label = \"РќРѕРјРµСЂ РґРѕРјР°:\"; key = \"eb_num\"; edit_width = 30; }" dcl_file)
       (write-line "  ok_cancel;" dcl_file)
       (write-line "}" dcl_file)
       (close dcl_file)
 
       (setq dcl_id (load_dialog file_path))
-      (if (not (new_dialog "zd_dialog" dcl_id)) (exit))
+      (if (not (new_dialog "zd_dialog" dcl_id)) 
+        (progn (setvar "OSMODE" old_osmode) (exit))
+      )
       
       (action_tile "accept" "(setq type_str (get_tile \"eb_type\") num_str (get_tile \"eb_num\")) (done_dialog)")
       (action_tile "cancel" "(setq type_str nil num_str nil) (done_dialog)")
@@ -112,11 +151,15 @@
       (unload_dialog dcl_id)
       (vl-file-delete file_path)
 
-      ;; 4. Запрос выбора стороны прямоугольника (Курсор-квадрат)
-      (setq sel (entsel "\nУкажите вдоль какой линии расположить подпись (выберите грань): "))
+      ;; 4. Р—Р°РїСЂРѕСЃ РІС‹Р±РѕСЂР° СЃС‚РѕСЂРѕРЅС‹ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРєР° (РљСѓСЂСЃРѕСЂ-РєРІР°РґСЂР°С‚)
+      (setvar "OSMODE" 0)
+      (setq sel (entsel "\nРЈРєР°Р¶РёС‚Рµ РІРґРѕР»СЊ РєР°РєРѕР№ Р»РёРЅРёРё СЂР°СЃРїРѕР»РѕР¶РёС‚СЊ РїРѕРґРїРёСЃСЊ (РІС‹Р±РµСЂРёС‚Рµ РіСЂР°РЅСЊ): "))
+      (setvar "OSMODE" old_osmode)
       
       (if (and sel ent)
         (progn
+          (setvar "OSMODE" 0)
+
           (setq side_pt (cadr sel)
                 p_near (vlax-curve-getClosestPointTo ent side_pt)
                 param (vlax-curve-getParamAtPoint ent p_near)
@@ -124,7 +167,7 @@
                 pt_end (vlax-curve-getPointAtParam ent (1+ (fix param)))
           )
           
-          ;; Переводим координаты в экранную систему (DCS) для точного поиска ПРАВОГО угла на экране
+          ;; Р­РєСЂР°РЅРЅР°СЏ СЃРёСЃС‚РµРјР° РєРѕРѕСЂРґРёРЅР°С‚ РґР»СЏ РїРѕРёСЃРєР° РїСЂР°РІРѕРіРѕ СѓРіР»Р° РЅР° РјРѕРЅРёС‚РѕСЂРµ
           (setq scr_start (trans pt_start 0 2)
                 scr_end (trans pt_end 0 2))
           
@@ -133,72 +176,68 @@
             (setq p_right_corner pt_start p_left_corner pt_end)
           )
 
-          ;; Рассчитываем базовые векторы от правого угла
-          (setq v_edge (mapcar '- p_left_corner p_right_corner) ; Вектор НАЗАД вдоль стены (справа налево)
+          ;; Р Р°СЃСЃС‡РёС‚С‹РІР°РµРј Р±Р°Р·РѕРІС‹Рµ РІРµРєС‚РѕСЂС‹ РѕС‚ РїСЂР°РІРѕРіРѕ СѓРіР»Р°
+          (setq v_edge (mapcar '- p_left_corner p_right_corner)
                 len_edge (distance p_right_corner p_left_corner)
-                u_right (mapcar '(lambda (x) (/ (- x) len_edge)) v_edge) ; Направляющий вектор "вправо"
-                v_in (list (- (cadr u_right)) (car u_right) 0.0)         ; Вектор "вверх" (перпендикуляр)
+                u_right (mapcar '(lambda (x) (/ (- x) len_edge)) v_edge)
+                v_in (list (- (cadr u_right)) (car u_right) 0.0)
           )
 
-          ;; Строгий вектор вовнутрь здания
+          ;; РЎС‚СЂРѕРіРёР№ РІРµРєС‚РѕСЂ РІРѕРІРЅСѓС‚СЂСЊ Р·РґР°РЅРёСЏ
           (if (minusp (+ (* (- (car c_pt) (car p_right_corner)) (car v_in)) (* (- (cadr c_pt) (cadr p_right_corner)) (cadr v_in))))
             (setq inside_dir (mapcar '- v_in))
             (setq inside_dir v_in)
           )
 
-          ;; Угол текста (всегда направлен слева направо)
+          ;; РЈРіРѕР» С‚РµРєСЃС‚Р° (РІСЃРµРіРґР° РЅР°РїСЂР°РІР»РµРЅ СЃР»РµРІР° РЅР°РїСЂР°РІРѕ)
           (setq norm_ang (angle '(0.0 0.0 0.0) u_right))
           (if (and (> norm_ang (/ pi 2.0)) (<= norm_ang (* pi 1.5)))
             (setq norm_ang (rem (+ norm_ang pi) (* 2.0 pi)))
           )
 
-          ;; --- Создание текста "Тип сооружения" ---
+          ;; --- РЎРѕР·РґР°РЅРёРµ С‚РµРєСЃС‚Р° "РўРёРї СЃРѕРѕСЂСѓР¶РµРЅРёСЏ" ---
           (if (and type_str (/= type_str ""))
-            (draw-mtext-safe type_str c_pt 1.0 norm_ang style1 "21_Здания_строения" nil 5)
+            (draw-mtext-safe type_str c_pt 1.0 norm_ang style1 "21_Р—РґР°РЅРёСЏ_СЃС‚СЂРѕРµРЅРёСЏ" nil 5)
           )
 
-          ;; --- Создание текста "Номер дома" с динамическим расчетом габаритов ---
+          ;; --- РЎРѕР·РґР°РЅРёРµ С‚РµРєСЃС‚Р° "РќРѕРјРµСЂ РґРѕРјР°" ---
           (if (and num_str (/= num_str ""))
             (progn
-              ;; 1. Создаем временный MTEXT для замера точной ширины строки
-              (setq tmp_txt (draw-mtext-safe num_str '(0.0 0.0 0.0) 1.0 norm_ang style2 "21_Здания_строения" 1 5))
-              
-              ;; 2. Считываем его габариты в пространстве модели
+              ;; Р—Р°РјРµСЂСЏРµРј С„РёР·РёС‡РµСЃРєРёРµ РіР°Р±Р°СЂРёС‚С‹ СЃС‚СЂРѕРєРё vla-РјРµС‚РѕРґРѕРј
+              (setq tmp_txt (draw-mtext-safe num_str '(0.0 0.0 0.0) 1.0 norm_ang style2 "21_Р—РґР°РЅРёСЏ_СЃС‚СЂРѕРµРЅРёСЏ" 1 5))
               (vla-getBoundingBox (vlax-ename->vla-object tmp_txt) 'minpt 'maxpt)
               (setq minpt (vlax-safearray->list minpt)
                     maxpt (vlax-safearray->list maxpt)
-                    ;; Фактическая ширина и высота текстового блока
                     txt_w (distance (list (car minpt) (cadr minpt) 0.0) (list (car maxpt) (cadr minpt) 0.0))
                     txt_h (distance (list (car minpt) (cadr minpt) 0.0) (list (car minpt) (cadr maxpt) 0.0))
               )
-              ;; Удаляем временный текстовый объект
               (entdel tmp_txt)
 
-              ;; 3. Динамически вычисляем центр смещения
-              ;; Чтобы край строки имел фиксированный зазор 0.2 от правой стены, 
-              ;; центр текста должен отступить назад на: (половина ширины текста + 0.2 отступа)
+              ;; Р’С‹С‡РёСЃР»СЏРµРј РёРґРµР°Р»СЊРЅС‹Р№ РѕС‚СЃС‚СѓРї С†РµРЅС‚СЂР°
               (setq shift_back (+ (/ txt_w 2.0) 0.2))
-              ;; Чтобы низ строки имел фиксированный зазор 0.2 от нижней стены,
-              ;; центр текста должен отступить внутрь на: (половина высоты текста + 0.2 отступа)
               (setq shift_in (+ (/ txt_h 2.0) 0.2))
 
-              ;; Финальные координаты математического центра текстового блока
+              ;; Р¤РёРЅР°Р»СЊРЅР°СЏ РєРѕРѕСЂРґРёРЅР°С‚Р° С†РµРЅС‚СЂР° MTEXT РЅРѕРјРµСЂР° РґРѕРјР°
               (setq text_base (list
                                 (+ (car p_right_corner) (* (- shift_back) (car u_right)) (* shift_in (car inside_dir)))
                                 (+ (cadr p_right_corner) (* (- shift_back) (cadr u_right)) (* shift_in (cadr inside_dir)))
                                 0.0
                               ))
 
-              ;; 4. Создаем чистовой MTEXT с идеальной посадкой в угол
-              (draw-mtext-safe num_str text_base 1.0 norm_ang style2 "21_Здания_строения" 1 5)
+              ;; РЎРѕР·РґР°РµРј РЅР°С‡РёСЃС‚Рѕ MTEXT (РџСЂРёРІСЏР·РєР° 5 - MC)
+              (draw-mtext-safe num_str text_base 1.0 norm_ang style2 "21_Р—РґР°РЅРёСЏ_СЃС‚СЂРѕРµРЅРёСЏ" 1 5)
             )
           )
         )
       )
     )
   )
+  
+  ;; РЎР±СЂРѕСЃ РѕР±СЂР°Р±РѕС‚С‡РёРєР° РѕС€РёР±РѕРє Рё С€С‚Р°С‚РЅРѕРµ РІРѕР·РІСЂР°С‰РµРЅРёРµ РїСЂРёРІСЏР·РѕРє
+  (setvar "OSMODE" old_osmode)
+  (setq *error* old_error)
   (princ)
 )
 
-(princ "\nСкрипт ZD успешно загружен. Для запуска введите: ZD\n")
+(princ "\nРЎРєСЂРёРїС‚ ZD СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅ. Р”Р»СЏ Р·Р°РїСѓСЃРєР° РІРІРµРґРёС‚Рµ: ZD\n")
 (princ)
